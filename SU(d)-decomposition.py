@@ -29,8 +29,8 @@ def generateGreyCode(baseKetS, baseKetT, n):
     return GreyBasis
 
 # Generate SU(2) Gates by CNOT and single qubit gate
-def generateCNOTs(baseKet, targetLoc, n):
-    CNOTseq = []
+def generateCNOTs(baseKet, targetLoc, n, controlledGate):
+    CNOTseq = [baseKet[0:targetLoc]+"+"+baseKet[targetLoc+1:n], targetLoc, controlledGate]
     return CNOTseq
 
 # Approximate SU(2) quantum gates
@@ -48,10 +48,12 @@ A = Matrix([[Rational(1,2), Rational(1,2), Rational(1,2), Rational(1,2)],
             [Rational(1,2), I*Rational(1,2), Rational(-1,2), I*Rational(-1,2)],
             [Rational(1,2), Rational(-1,2), Rational(1,2), Rational(-1,2)],
             [Rational(1,2), I*Rational(-1,2), Rational(-1/2), I*Rational(1/2)]])
+gateX = Matrix([[0,1],[1,0]])
 
 # Calculate SU(d) operator's dimension
 n = A.shape.__getitem__(0)
-print(n)
+qubitCnt = expand(log(n)/log(2))
+print("#Dimension:", n, ", #Qubits:", qubitCnt)
 
 # Decompose SU(d) to two-level unitaries
 U = []
@@ -90,6 +92,7 @@ for j in range(0,n-1):
             # pprint(expand(A))
 # verify whether the decomposition is correct or not.
 V = eye(n)
+print("Decompose to two-level unitary: ")
 for Ui in U:
     pprint(Ui)
     V = V*Ui
@@ -98,21 +101,27 @@ pprint(expand(V))
 # Transform two-level unitary to CNOT and single qubit gates
 idx = 0
 SU2Gates = []
+print("Decompose to controlled gates: ")
 for Ui in U:
     s, t = Uidx[idx][0], Uidx[idx][1]
     idx = idx+1
     # Generate Grey Codes
-    BaseS, BaseT = getBaseKet(s,n), getBaseKet(t,n)
-    GreyBasisSeq = generateGreyCode(BaseS, BaseT, n)
-    print(GreyBasisSeq)
+    BaseS, BaseT = getBaseKet(s,qubitCnt), getBaseKet(t,qubitCnt)
+    GreyBasisSeq = generateGreyCode(BaseS, BaseT, qubitCnt)
+    # print(GreyBasisSeq)
     GreyBasisLength = len(GreyBasisSeq)
     # Decompose the two-level unitary, i.e. permute the unitary to get single qubit gate
-    for i in range(1,GreyBasisLength):
-        SU2Gates.append(generateCNOTs(GreyBasisSeq[i][0], GreyBasisSeq[i][1], n))
+    for i in range(1,GreyBasisLength-1):
+        SU2Gates.append(generateCNOTs(GreyBasisSeq[i][0], GreyBasisSeq[i][1], qubitCnt, gateX))
     # Approximate single qubit gate
-    SU2Gates.append(SU2Approx(Ui, s, t, n))
+    SU2Gates.append(generateCNOTs(GreyBasisSeq[GreyBasisLength-1][0],
+                                  GreyBasisSeq[GreyBasisLength-1][1],
+                                  qubitCnt,
+                                  SU2Approx(Ui, s, t, n)))
     # Decompose the two-level unitary, i.e. permute the unitary to restore original version
-    for i in range(GreyBasisLength-1,-1,-1):
+    for i in range(GreyBasisLength-2,-1,-1):
         if i < 1:
             break
-        SU2Gates.append(generateCNOTs(GreyBasisSeq[i][0], GreyBasisSeq[i][1], n))
+        SU2Gates.append(generateCNOTs(GreyBasisSeq[i][0], GreyBasisSeq[i][1], qubitCnt, gateX))
+    for gate in SU2Gates:
+        pprint(gate)
