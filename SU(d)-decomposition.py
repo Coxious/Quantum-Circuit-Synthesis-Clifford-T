@@ -4,6 +4,7 @@
 from sympy import *
 init_printing(use_unicode=True)
 
+
 # Get the two-level unitary's non-trivial basis
 def getBaseKet(ket, qubitCnt):
     baseKet = ""
@@ -13,6 +14,7 @@ def getBaseKet(ket, qubitCnt):
         else:
             baseKet = "0" + baseKet
     return baseKet
+
 
 # Generate Grey Code from ket |s> to ket |t>
 def generateGreyCode(baseKetS, baseKetT, n):
@@ -28,10 +30,12 @@ def generateGreyCode(baseKetS, baseKetT, n):
             GreyBasis.append([baseKetS,i])
     return GreyBasis
 
+
 # Generate SU(2) Gates by CNOT and single qubit gate
 def generateCNOTs(baseKet, targetLoc, n, controlledGate):
     CNOTseq = [baseKet[0:targetLoc]+"+"+baseKet[targetLoc+1:n], targetLoc, controlledGate]
     return CNOTseq
+
 
 # Approximate SU(2) quantum gates
 def SU2Approx(twoLevelUnitary, s, t, n):
