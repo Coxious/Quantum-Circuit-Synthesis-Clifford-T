@@ -114,4 +114,4 @@ print(exactDecompose(UBloch))
 # Leave problem:
 # 1. Clifford Gate at the tail -> Decomposition?
 # 2. Clifford Gate -> Permutation -> Affect on MA Form?
-# 3. Tooooo Slowly!
+# 3. Tooooo Slow!
