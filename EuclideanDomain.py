@@ -8,11 +8,13 @@ init_printing(use_unicode=True)
 # Euclidean Domain Number Z[i,1/sqrt(2)] -> Z[w]
 class EuclideanDomainNum:
     def __init__(self):
+        self.reducedNow = True
         self.root = exp(pi*I*Rational(1,4))
         self.poly = [0,0,0,0]
         self.de = 0
 
     def __init__(self, poly, de):
+        self.reducedNow = True
         self.root = exp(pi*I*Rational(1,4))
         self.set(poly, de)
 
@@ -33,24 +35,37 @@ class EuclideanDomainNum:
         s = [r[1]-r[3], r[2]+r[0], r[1]+r[3], r[2]-r[0]]
         return s
 
+    # Adjust all coefficients after multiplied directly by sqrt2
+    def mul_sqrt2d(self):
+        r = self.mul_sqrt2(self.poly)
+        return EuclideanDomainNum(r, self.de)
+
+    def isDiv2(self, r):
+        return (r[0]%2==0) and (r[1]%2==0) and (r[2]%2==0) and (r[3]%2==0)
+
     # Re-calculate its denomExp and poly by case
     def reduce(self, type):
         # Re-calculate its denomExp and poly directly
         if type == 0:
+            r = self.poly
+            # if r[0]==0 and r[1]==0 and r[2]==0 and r[3]==0:
+            #    self.de = oo
             # For 2
             isDiv2 = True
             while isDiv2 and self.de >= 2:
-                for i in range(0,4):
-                    isDiv2 = isDiv2 and (self.poly[i]%2==0)
+                #if self.de < -100 or self.de == oo:
+                #    self.de = oo
+                #    break
+                isDiv2 = self.isDiv2(self.poly)
                 if isDiv2:
                     for i in range(0,4):
                         self.poly[i] *= Rational(1,2)
                     self.de -= 2
             # For sqrt2
-            isDivSqrt2 = ((self.poly[1]-self.poly[3])%2 == 0) \
-                     and ((self.poly[2]+self.poly[0])%2 == 0) \
-                     and ((self.poly[1]+self.poly[3])%2 == 0) \
-                     and ((self.poly[2]-self.poly[0])%2 == 0)
+            isDivSqrt2 = self.isDiv2([self.poly[1]-self.poly[3], \
+                                      self.poly[2]+self.poly[0], \
+                                      self.poly[1]+self.poly[3], \
+                                      self.poly[2]-self.poly[0]])
             if isDivSqrt2 and self.de >= 1:
                 poly = [0,0,0,0]
                 poly[0] = (self.poly[1]-self.poly[3])*Rational(1,2)
@@ -58,6 +73,32 @@ class EuclideanDomainNum:
                 poly[2] = (self.poly[1]+self.poly[3])*Rational(1,2)
                 poly[3] = (self.poly[2]-self.poly[0])*Rational(1,2)
                 self.poly = poly
+                self.de -= 1
+        # Divided by 2
+        elif type == 2:
+            isDiv2 = True
+            if isDiv2:
+                for i in range(0,4):
+                    isDiv2 = isDiv2 and (self.poly[i]%2==0)
+                if isDiv2:
+                    for i in range(0,4):
+                        self.poly[i] *= Rational(1,2)
+            else:
+                self.de -= 2
+        # Divided by sqrt(2)
+        elif type == 1:
+            isDivSqrt2 = ((self.poly[1] - self.poly[3]) % 2 == 0) \
+                         and ((self.poly[2] + self.poly[0]) % 2 == 0) \
+                         and ((self.poly[1] + self.poly[3]) % 2 == 0) \
+                         and ((self.poly[2] - self.poly[0]) % 2 == 0)
+            if isDivSqrt2:
+                poly = [0, 0, 0, 0]
+                poly[0] = (self.poly[1] - self.poly[3]) * Rational(1, 2)
+                poly[1] = (self.poly[2] + self.poly[0]) * Rational(1, 2)
+                poly[2] = (self.poly[1] + self.poly[3]) * Rational(1, 2)
+                poly[3] = (self.poly[2] - self.poly[0]) * Rational(1, 2)
+                self.poly = poly
+            else:
                 self.de -= 1
         return self
 
@@ -78,7 +119,11 @@ class EuclideanDomainNum:
                 s = self.mul_sqrt2(s)
         for i in range(0, 4):
             poly[i] = r[i] + s[i]
-        return EuclideanDomainNum(poly, de).reduce(0)
+        res = EuclideanDomainNum(poly, de)
+        if self.reducedNow == True:
+            return res.reduce(0)
+        else:
+            return res
 
     # Subtraction operation for different donomExp situations
     def __sub__(self, other):
@@ -97,7 +142,19 @@ class EuclideanDomainNum:
         poly[2] = r[2]*s[3]+r[3]*s[2]-r[1]*s[0]-r[0]*s[1]
         poly[1] = r[3]*s[1]+r[2]*s[2]+r[1]*s[3]-r[0]*s[0]
         poly[0] = s[0]*r[3]+s[1]*r[2]+s[2]*r[1]+s[3]*r[0]
-        return EuclideanDomainNum(poly, de).reduce(0)
+        res = EuclideanDomainNum(poly, de)
+        if self.reducedNow == True:
+            return res.reduce(0)
+        else:
+            return res
+
+    # Reduce trigger
+    def changeReduceState(self, toState):
+        if toState:
+            self.reducedNow = True
+            self.reduce(0)
+        else:
+            self.reducedNow = False
 
     # Equal or not
     def __eq__(self, other):
@@ -105,6 +162,15 @@ class EuclideanDomainNum:
             if self.poly[i] != other.poly[i]:
                 return False
         return self.de == other.de
+
+    # Calculate gde2
+    def gdeForNorm(self):
+        num = self.norm(False)
+        res = 0
+        while num % 2 == 0:
+            num /= 2,
+            res += 2
+        return res
 
     # Return norm function
     def norm(self, useDenomExp):
@@ -123,7 +189,18 @@ class EuclideanDomainNum:
     def v(self):
         re = self.poly[3]+sqrt(Rational(1,2))*(self.poly[2]-self.poly[0])
         im = self.poly[1]+sqrt(Rational(1,2))*(self.poly[2]+self.poly[0])
-        return ((sqrt(Rational(1,2))**self.de) * (re+I*im)).expand(complex=True)
+        res = re+I*im
+        if self.de == 0:
+            return res.expand(complex=True)
+        else:
+            return ((sqrt(Rational(1,2))**self.de) * res).expand(complex=True)
+
+    def getAlgebraicNumber(self):
+        return AlgebraicNumber(self.root, self.poly)
+
+    def getDenomExp(self):
+        return self.de
+
 
 # Ring number test
 a0 = EuclideanDomainNum([2,3,4,5],0)
@@ -133,6 +210,7 @@ b1 = EuclideanDomainNum([3,4,5,6],1)
 b3 = EuclideanDomainNum([3,4,5,6],3)
 c0 = EuclideanDomainNum([1,1,1,1],0)
 c1 = EuclideanDomainNum([1,1,1,1],1)
+
 # Initialization Test
 # (1)[2,3,4,5] =  1 + 5*sqrt(2)/2 + 3*sqrt(2)*I/2 + 3*I
 # (2)[2,3,4,5] =  sqrt(2)/2 + 5/2 + 3*I/2 + 3*sqrt(2)*I/2
@@ -140,13 +218,16 @@ c1 = EuclideanDomainNum([1,1,1,1],1)
 # (3)[3,4,5,6] =  1/2 + 3*sqrt(2)/2 + sqrt(2)*I + 2*I
 # (0)[1,1,1,1] =  1 + I + sqrt(2)*I
 # (1)[1,1,1,1] =  sqrt(2)/2 + sqrt(2)*I/2 + I
-print("(0)[2,3,4,5] = ", a1.v(), a1.norm(False))
-print("(1)[2,3,4,5] = ", a1.v(), a1.norm(False))
-print("(2)[2,3,4,5] = ", a2.v(), a2.norm(False))
-print("(1)[3,4,5,6] = ", b1.v(), b1.norm(False))
-print("(3)[3,4,5,6] = ", b3.v(), b3.norm(False))
-print("(0)[1,1,1,1] = ", c0.v(), c0.norm(False))
-print("(1)[1,1,1,1] = ", c1.v(), c1.norm(False))
+initializationTest = False
+if initializationTest:
+    print("(0)[2,3,4,5] = ", a0.v(), a1.norm(False))
+    print("(1)[2,3,4,5] = ", a1.v(), a1.norm(False))
+    print("(2)[2,3,4,5] = ", a2.v(), a2.norm(False))
+    print("(1)[3,4,5,6] = ", b1.v(), b1.norm(False))
+    print("(3)[3,4,5,6] = ", b3.v(), b3.norm(False))
+    print("(0)[1,1,1,1] = ", c0.v(), c0.norm(False))
+    print("(1)[1,1,1,1] = ", c1.v(), c1.norm(False))
+
 # Addition Test
 # (1)[2,3,4,5]+(1)[3,4,5,6] =  2 + 11*sqrt(2)/2 + 7*sqrt(2)*I/2 + 7*I
 # (1)[2,3,4,5]+(3)[3,4,5,6] =  3/2 + 4*sqrt(2) + 5*sqrt(2)*I/2 + 5*I
@@ -154,23 +235,31 @@ print("(1)[1,1,1,1] = ", c1.v(), c1.norm(False))
 # (1)[2,3,4,5]-(3)[3,4,5,6] =  1/2 + sqrt(2) + sqrt(2)*I/2 + I
 # (2)[2,3,4,5]-(0)[1,1,1,1] =  sqrt(2)/2 + 3/2 + I/2 + sqrt(2)*I/2
 # (1)[2,3,4,5]+(1)[1,1,1,1] =  1 + 3*sqrt(2) + 2*sqrt(2)*I + 4*I
-print("(1)[2,3,4,5]+(1)[3,4,5,6] = ", (a1+b1).v())
-print("(1)[2,3,4,5]+(3)[3,4,5,6] = ", (a1+b3).v())
-print("(2)[2,3,4,5]+(1)[3,4,5,6] = ", (a2+b1).v())
-print("(1)[2,3,4,5]-(3)[3,4,5,6] = ", (a1-b3).v())
-print("(2)[2,3,4,5]-(0)[1,1,1,1] = ", (a2-c0).v())
-print("(1)[2,3,4,5]+(1)[1,1,1,1] = ", (a1+c1).v())
+additionTest = False
+if additionTest:
+    print("(1)[2,3,4,5]+(1)[3,4,5,6] = ", (a1+b1).v())
+    print("(1)[2,3,4,5]+(3)[3,4,5,6] = ", (a1+b3).v())
+    print("(2)[2,3,4,5]+(1)[3,4,5,6] = ", (a2+b1).v())
+    print("(1)[2,3,4,5]-(3)[3,4,5,6] = ", (a1-b3).v())
+    print("(2)[2,3,4,5]-(0)[1,1,1,1] = ", (a2-c0).v())
+    print("(1)[2,3,4,5]+(1)[1,1,1,1] = ", (a1+c1).v())
+
 # Equivalent Test
 # (1)[2,3,4,5]+(1)[1,1,1,1]=(1)[3,4,5,6] :  True
 # (1)[2,3,4,5]+(3)[3,4,5,6]=(0)[1,1,1,1] :  False
-print("(1)[2,3,4,5]+(1)[1,1,1,1]=(1)[3,4,5,6] : ", a1+c1 == b1)
-print("(1)[2,3,4,5]+(3)[3,4,5,6]=(0)[1,1,1,1] : ", a1+b3 == c0)
+equivalentTest = False
+if equivalentTest:
+    print("(1)[2,3,4,5]+(1)[1,1,1,1]=(1)[3,4,5,6] : ", a1+c1 == b1)
+    print("(1)[2,3,4,5]+(3)[3,4,5,6]=(0)[1,1,1,1] : ", a1+b3 == c0)
+
 # Multiplication Test
 # (0)[2,3,4,5]*(0)[1,1,1,1] =  -5*sqrt(2) - 4 + 10*I + 9*sqrt(2)*I
 # (1)[2,3,4,5]*(3)[3,4,5,6] =  -13*sqrt(2)/4 - 1 + 13*I + 45*sqrt(2)*I/4
 # (2)[2,3,4,5]*(1)[3,4,5,6] =  -13/2 - sqrt(2) + 13*sqrt(2)*I + 45*I/2
 # (2)[2,3,4,5]*(3)[3,4,5,6] =  -13/4 - sqrt(2)/2 + 13*sqrt(2)*I/2 + 45*I/4
-print("(0)[2,3,4,5]*(0)[1,1,1,1] = ", (a0*c0).v())
-print("(1)[2,3,4,5]*(3)[3,4,5,6] = ", (a1*b3).v())
-print("(2)[2,3,4,5]*(1)[3,4,5,6] = ", (a2*b1).v())
-print("(2)[2,3,4,5]*(3)[3,4,5,6] = ", (a2*b3).v())
+multiplicationTest = False
+if multiplicationTest:
+    print("(0)[2,3,4,5]*(0)[1,1,1,1] = ", (a0*c0).v())
+    print("(1)[2,3,4,5]*(3)[3,4,5,6] = ", (a1*b3).v())
+    print("(2)[2,3,4,5]*(1)[3,4,5,6] = ", (a2*b1).v())
+    print("(2)[2,3,4,5]*(3)[3,4,5,6] = ", (a2*b3).v())

@@ -23,25 +23,74 @@ class Stack:
 
 # Matrix representation using DenomExp enlarge
 class MatrixZ:
-    def __init__(self):
-        rootNow = exp(pi*I*Rational(1,4))
-        oneNow = AlgebraicNumber(rootNow, [0,0,0,1])
-        zeroNow = AlgebraicNumber(rootNow, [0,0,0,0])
-        self.m = Matrix([[oneNow, zeroNow],[zeroNow, oneNow]])
-        self.de = 0
-
-    def setValue(self, m, de):
-        assert isinstance(m, Matrix)
-        assert m.shape == (2,2)
-        assert isinstance(m[0], AlgebraicNumber)
-        assert isinstance(m[1], AlgebraicNumber)
-        assert isinstance(m[2], AlgebraicNumber)
-        assert isinstance(m[3], AlgebraicNumber)
+    def __init__(self, m):
+        self.root = exp(pi*I*Rational(1,4))
+        assert isinstance(m, list)
+        assert len(m) == 4
+        assert isinstance(m[0], EuclideanDomainNum)
+        assert isinstance(m[1], EuclideanDomainNum)
+        assert isinstance(m[2], EuclideanDomainNum)
+        assert isinstance(m[3], EuclideanDomainNum)
         self.m = m
-        self.de = de
+
+    def __getitem__(self, index):
+        assert isinstance(index, int) or isinstance(index, Integer)
+        assert 0 <= index <= 3
+        return self.m[index]
+
+    def __setitem__(self, index, value):
+        assert isinstance(index, int) or isinstance(index, Integer)
+        assert isinstance(value, EuclideanDomainNum)
+        assert 0 <= index <= 3
+        self.m[index] = value
+
+    def __add__(self, other):
+        m = [0, 0, 0, 0]
+        for i in range(0, 4):
+            m[i] = self.m[i] + other.m[i]
+        return MatrixZ(m)
+
+    def __sub__(self, other):
+        m = [0, 0, 0, 0]
+        for i in range(0, 4):
+            m[i] = self.m[i] - other.m[i]
+        return MatrixZ(m)
 
     def __mul__(self, other):
-        self.m = self.m * other.m
+        # print("Multiplication Running!")
+        r, s = self.m, other.m
+        # print(r[0].v(), s[0].v(), (r[0]*s[0]).v(), (r[0]*s[0]).getDenomExp())
+        # print(r[1].v(), s[2].v(), (r[1]*s[2]).v(), (r[1]*s[2]).getDenomExp())
+        # print((r[0]*s[0]+r[1]*s[2]).v())
+        m = [r[0]*s[0]+r[1]*s[2],\
+             r[0]*s[1]+r[1]*s[3],\
+             r[2]*s[0]+r[3]*s[2],\
+             r[2]*s[1]+r[3]*s[3]]
+        # print("Multiplication Done")
+        return MatrixZ(m)
+
+    def getMatrix(self):
+        return Matrix([[self.m[0].v(), self.m[1].v()], [self.m[2].v(), self.m[3].v()]], complex=True)
+
+# For w in Z[1/sqrt(2),i], enlarge it (i.e. multiply sqrt(2)^k) such that \tilde{w} in Z[exp(i*pi/4)]
+def getDenomExp(item):
+    DenomExp = 0;
+    DenomExp2 = 0;
+    # Enlarge it by 2
+    while True:
+        # print("Enlarge: ", expand(item), ", DenomExp2 = ", DenomExp2)
+        coeff = getCoefficients(item)
+        if len(coeff) == 0:
+            DenomExp2 += 1
+            item *= 2
+        else:
+            break
+    coeff = getCoefficients(item / sqrt(2))
+    if len(coeff) == 0:
+        DenomExp = 2 * DenomExp2
+    else:
+        DenomExp = 2 * DenomExp2 - 1
+    return DenomExp
 
 # Get the coefficients for (1/sqrt(2))^DenomExp w, where w in Z[1/sqrt(2),i]
 # Return integer coefficients or empty (exists non-integer coefficient)
@@ -68,7 +117,7 @@ def getCoefficients(item):
                 # print("Update stack: ", terms.getAll())
             elif termNow.is_Integer:
                 coeff.append(termNow)
-                print("## Got Efficient: ", termNow)
+                # print("## Got Efficient: ", termNow)
                 item -= roots[idx] * termNow
                 foundIntCoeff = True
                 break
@@ -76,53 +125,45 @@ def getCoefficients(item):
             return []
     return coeff
 
-# For w in Z[1/sqrt(2),i], enlarge it (i.e. multiply sqrt(2)^k) such that \tilde{w} in Z[exp(i*pi/4)]
-def getDenomExp(item):
-    DenomExp = 0;
-    DenomExp2 = 0;
-    # Enlarge it by 2
-    while True:
-        print("Enlarge: ", expand(item), ", DenomExp2 = ", DenomExp2)
-        coeff = getCoefficients(item)
-        if len(coeff) == 0:
-            DenomExp2 += 1
-            item *= 2
-        else:
-            break
-    coeff = getCoefficients(item/sqrt(2))
-    if len(coeff) == 0:
-        DenomExp = 2*DenomExp2
-    else:
-        DenomExp = 2*DenomExp2-1
-    return DenomExp
-
 # Get this gate's exact decomposition
-def exactDecompose(U, UNow=None):
+def exactDecompose(UOri, UNow=None):
     # Hadamard gate and T gate
-    Hgate = Matrix([[sqrt(Rational(1, 2)), sqrt(Rational(1, 2))],
-                    [sqrt(Rational(1, 2)), -sqrt(Rational(1, 2))]], complex=True)
-    Tgate = Matrix([[1, 0], [0, exp(I * pi * Rational(1, 4))]], complex=True)
-    invTgate = Matrix([[1, 0], [0, exp(-I * pi * Rational(1, 4))]], complex=True)
+    one = EuclideanDomainNum([0,0,0,1],0)
+    zero = EuclideanDomainNum([0,0,0,0],0)
+    Hgate = MatrixZ([EuclideanDomainNum([0,0,0,1],1), \
+                    EuclideanDomainNum([0,0,0,1],1),\
+                    EuclideanDomainNum([0,0,0,1],1), \
+                    EuclideanDomainNum([0,0,0,-1],1)])
+    Tgate = MatrixZ([one, zero, zero, EuclideanDomainNum([0,0,1,0],0)])
+    invTgate = MatrixZ([one, zero, zero, EuclideanDomainNum([-1,0,0,0],0)])
+    U = MatrixZ([one, one, one, one])
     # Main process
     unitarySeq = ""
     denomExp = []
     for i in Range(0,4):
-        de = getDenomExp(U[0])
+        de = getDenomExp(UOri[i])
         denomExp.append(de)
-        U[0] *= (sqrt(2)**de)
-    sdeNow = getInitDenomExp(U[0])
+        U[i] = EuclideanDomainNum(getCoefficients(UOri[i]*(sqrt(2)**de)),de)
+    sdeNow = U[0].getDenomExp()*4 - U[0].gdeForNorm()
     while sdeNow > 3:
-        print(U, sdeNow)
+        print(U.getMatrix(), sdeNow)
         isFound = False
-        invTgates = Matrix([[1,0],[0,1]], complex=True)
+        invTgates = MatrixZ([one, zero, zero, one])
         invTs = ""
         for k in Range(0,4):
+            print("Running: ", k)
             if k > 0:
                 invTgates = invTgates*invTgate
                 invTs = invTs+"T"
+            print("Running Mul Done: ", k)
+            UNow = U
             while isFound == False:
-                UNow = Hgate*invTgates*U
-                sdeTmp = getInitDenomExp(UNow[0])
+                print("Running While: ", k)
+                UNow = Hgate*invTgates*UNow
+                print("Running UNow Done: ", k)
+                sdeTmp = UNow[0].getDenomExp()*4 - UNow[0].gdeForNorm()
+                print("Running sdeTmp Done: ", k)
+                print(UNow.getMatrix(), sdeTmp)
                 if sdeTmp == sdeNow-1:
                     isFound = True
                     unitarySeq = unitarySeq + invTs + "H"
@@ -140,11 +181,30 @@ Tgate = Matrix([[1, 0], [0, exp(I*pi*Rational(1,4))]], complex=True)
 U = Matrix([[sqrt(Rational(1,2))**10+I*sqrt(Rational(1,2))**4, (I-1)*Rational(1,2)],
             [(I+1)*Rational(1,2), sqrt(Rational(1,2))]])
 
-# print(U[0], getInitDenomExp(getNorm(U[0])), getInitDenomExp(getNorm(U[1])))
-# print(exactDecompose(U))
+print(exactDecompose(U))
 
-# testNum = (-Rational(29,2)*sqrt(2)+1222+23*I+sqrt(2)*I*Rational(37,2))*(sqrt(Rational(1,2))**89)
-# testNum = sqrt(Rational(1, 2))
-# de = getDenomExp(testNum)
-# print(de, getCoefficients(testNum*(sqrt(2)**de)))
-# print("Test Done")
+testCoeffAnalysis = False
+if testCoeffAnalysis:
+    testNum = (-Rational(29, 2) * sqrt(2) + 1222 + 23 * I + sqrt(2) * I * Rational(37, 2)) * (
+    sqrt(Rational(1, 2)) ** 89)
+    testNum1 = sqrt(Rational(1, 2))
+    testNum2 = -sqrt(Rational(1, 2))
+    testNum3 = 1
+    testNum4 = 0
+    testNum5 = exp(I * pi * Rational(1, 4))
+    testNum6 = exp(-I * pi * Rational(1, 4))
+    # de = getDenomExp(testNum)
+    # print("Test0: ", de, getCoefficients(testNum*(sqrt(2)**de)))
+    de = getDenomExp(testNum1)
+    print("Test1: ", de, getCoefficients(testNum1*(sqrt(2)**de)))
+    de = getDenomExp(testNum2)
+    print("Test2: ", de, getCoefficients(testNum2*(sqrt(2)**de)))
+    de = getDenomExp(testNum3)
+    print("Test3: ", de, getCoefficients(testNum3*(sqrt(2)**de)))
+    de = getDenomExp(testNum4)
+    print("Test4: ", de, getCoefficients(testNum4*(sqrt(2)**de)))
+    de = getDenomExp(testNum5)
+    print("Test5: ", de, getCoefficients(testNum5*(sqrt(2)**de)))
+    de = getDenomExp(testNum6)
+    print("Test6: ", de, getCoefficients(testNum6*(sqrt(2)**de)))
+print("Test Done")
