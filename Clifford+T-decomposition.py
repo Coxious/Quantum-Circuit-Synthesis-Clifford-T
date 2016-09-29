@@ -110,8 +110,3 @@ UBloch = getBlochRep(Tgate*Hgate*Tgate*Sgate*Hgate*Tgate*Sgate*Hgate*Tgate*Hgate
 pprint(UBloch)
 pprint(getLeastDenominatorExponent(UBloch))
 print(exactDecompose(UBloch))
-
-# Leave problem:
-# 1. Clifford Gate at the tail -> Decomposition?
-# 2. Clifford Gate -> Permutation -> Affect on MA Form?
-# 3. Tooooo Slow!
